@@ -17,46 +17,6 @@ import sqlite3
 import tqdm
 import random
 
-#TODO: change: lebih static nanti menggunakan file setting.py sehingga terpusat
-conn = sqlite3.connect('berita.db')
-c = conn.cursor()
-c.execute("SELECT Text,Date,Clock,Sentiment From Berita ")
-result = c.fetchall()
-
-#TODO: menunggu refactor database
-#TODO: use meaningful name for variable
-d = Database()
-data = {}
-label = {}
-for I in result:
-    session = d.cariSesi(I[1],I[2])[0]
-    if session not in data:
-        data[session] = []
-        label[session] = I[3]
-    sentence = I[0]
-    newSentence = ""
-    for J in sentence:
-        if J.isalpha():
-            newSentence += J
-        else:
-            newSentence += " "
-    data[session].append(newSentence)
-
-
-#TODO: change sorting algorithm to NlogN algorithm using new class
-# Sorting the chronological order
-#MeTooLazySoMeBubbleSort
-
-chronology = list(data.keys())
-
-for I in range(len(data.keys())):
-    for J in range(I+1,len(data.keys())):
-        if chronology[I] > chronology[J]:
-            chronology[I],chronology[J] = chronology[J],chronology[I]
-
-date = [chronology[len(chronology)*I//6-1] for I in range(1,7)]
-
-
 def balancedTrain(X,y,mode):
     '''
     mode has two options:
@@ -126,6 +86,7 @@ def splitGroup(kFold):
     group = [index[len(index)*I//kFold:len(index)*(I+1)//kFold] for I in range(kFold)]
     return group
 
+#TODO: SAMA BISA JADIKAN SATU FILE
 #Custom class for GradientBoosting
 class Boosting():
     #TODO: dokumentasi
@@ -139,6 +100,8 @@ class Boosting():
         for I in range(m):
             pred.extend(self.clf.predict(X[I*X.shape[0]//m:(I+1)*X.shape[0]//m].toarray()))
         return pred
+
+#TODO: SAMA BISA JADIKAN SATU FILE
 #Custom class for K Nearest Neighbor
 class Neighbors:
     #TODO: dokumentasi
@@ -318,6 +281,7 @@ for iter in range(5):
     dataY = {}
 
     for entry in testData:
+        #TODO: bug
         if entry[5] not in lengthOfTestData:
             lengthOfTestData[entry[5]] = 0
             dataY[entry[5]] = entry[7]
@@ -360,3 +324,49 @@ for I in range(len(name)):
 print(mrePred)
 print(trainVector.shape[1])
 print(testX[0])
+
+
+## MAIN ============= MAIN ##
+def main():
+    #TODO: change: lebih static nanti menggunakan file setting.py sehingga terpusat
+    conn = sqlite3.connect('berita.db')
+    c = conn.cursor()
+    c.execute("SELECT Text,Date,Clock,Sentiment From Berita ")
+    result = c.fetchall()
+    print(result)
+
+    #TODO: menunggu refactor database
+    #TODO: use meaningful name for variable
+    db = Database()
+    data = {}
+    label = {}
+
+    for I in result:
+        session = db.cariSesi(I[1],I[2])[0]
+        if session not in data:
+            data[session] = []
+            label[session] = I[3]
+        sentence = I[0]
+        newSentence = ""
+        for J in sentence:
+            if J.isalpha():
+                newSentence += J
+            else:
+                newSentence += " "
+        data[session].append(newSentence)
+
+    #TODO: change sorting algorithm to NlogN algorithm using new class
+    # Sorting the chronological order
+    #MeTooLazySoMeBubbleSort
+    chronology = list(data.keys())
+
+    for I in range(len(data.keys())):
+        for J in range(I+1,len(data.keys())):
+            if chronology[I] > chronology[J]:
+                chronology[I],chronology[J] = chronology[J],chronology[I]
+
+    date = [chronology[len(chronology)*I//6-1] for I in range(1,7)]
+
+
+if __main__ == "__name__":
+    main()
