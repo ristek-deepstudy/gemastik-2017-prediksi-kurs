@@ -202,56 +202,25 @@ del result
 #TODO: ada baiknya lines ke bawah ini pake function per tugas jadi debug lebih mudah
 mrePred = []
 for iter in range(5):
+    print("Memulai pengambilan data")
     mreTotal = []
-    query = "Select * from berita WHERE Date <= "+str(date[iter])+" AND Title LIKE '%ekono%' "
+    query = "Select * from berita WHERE Date <= "+str(date[iter])
     c.execute(query)
     trainData = c.fetchall()
     
-    query = "Select * from berita WHERE Date <= "+str(date[iter])+" AND NOT Title LIKE '%ekono%' "
-    c.execute(query)
-    trainDataUnknown = c.fetchall()
     
-    query = "Select * from berita WHERE Date <= "+str(date[iter+1])+" AND "+str(date[iter])+"< Date AND NOT Title LIKE '%ekono%' "
+    query = "Select * from berita WHERE Date <= "+str(date[iter+1])+" AND "+str(date[iter])
     c.execute(query)
     testData = c.fetchall()
-    
-    print("Data berhasil difetch")
-    print(len(trainDataUnknown),len(trainData),len(testData))
-    filtered = []
-
-    #TODO: meaningful names
-    for I in range(0,len(trainDataUnknown),len(trainData)):
-        X = [J[3] for J in trainData]
-        y = [int(1) for J in trainData]
-        toEvaluate = [J[3] for J in trainDataUnknown[I:I+len(trainData)]]
-        X += toEvaluate
-        y += [int(0) for J in toEvaluate]
-    
-        counter = CV()
-        vector = counter.fit_transform(bersihkanTeksBerita(X))
-        toEvaluateVector = counter.transform(bersihkanTeksBerita(toEvaluate))
-    
-        bayes = NB()
-        bayes.fit(vector,y)
-        predict = bayes.predict_proba(toEvaluateVector)
-    
-        for J in range(len(predict)):
-            if predict[J][1] > 0.9:
-                filtered.append(trainDataUnknown[I+J])
-    
-    print("Data berhasil difilter")
-    
-    trainData += filtered
-    print(len(filtered))
     # Do cross-validation to choose the best feature selection
     
-    X = []
-    y = []
+    X = bersihkanTeksBerita([I[3] for I in trainData])
+    y = [I[7] for I in trainData]
     
-    for I in trainData:
-        X.append(I[3])
-        y.append(I[7])
-        
+    # Mengurangi memori
+    del trainData
+    
+    print("Memulai CV")       
     group = splitGroup(5)
     XkFold = [[X[J] for J in K]for K in group]
     YkFold = [[y[J] for J in K]for K in group]
@@ -265,18 +234,16 @@ for iter in range(5):
     
         xTest  = []
         yTest = []
+        
         for J in range(5):
-            if J == I:
-                for L in XkFold[J]:
-                    xTest.append(L)
-                yTest.extend(YkFold[J])
-            else:
-                for L in XkFold[J]:
-                    xTrain.append(L)
+            if J != I:
+                xTrain.extend(XkFold[J])
                 yTrain.extend(YkFold[J])
+            else:
+                testIndex = J
 
         xTrain = transform(xTrain)
-        xTest = transform(xTest)
+        xTest = transform(XkFold[testIndex])
 
         assert len(xTrain) == len(yTrain)
         xTrainNew , yTrainNew = balancedTrain(xTrain,yTrain,'CV')
@@ -293,7 +260,7 @@ for iter in range(5):
         for J in clfOption:
             J.fit(trainVector,yTrainNew)
             prediction = J.predict(testVector)
-            mreTotal[-1] += mrc(prediction,yTest)
+            mreTotal[-1] += mrc(prediction,YkFold[testIndex])
     
     index = mreTotal.index(max(mreTotal))
     
@@ -318,10 +285,10 @@ for iter in range(5):
     dataY = {}
 
     for entry in testData:
-        if entry[5] not in lengthOfTestData:
-            lengthOfTestData[entry[5]] = 0
-            dataY[entry[5]] = entry[7]
-        lengthOfTestData[entry[5]] += 1
+        if d.cariSesi(entry[5],entry[6])[0] not in lengthOfTestData:
+            lengthOfTestData[d.cariSesi(entry[5],entry[6])[0]] = 0
+            dataY[d.cariSesi(entry[5],entry[6])[0]] = entry[7]
+        lengthOfTestData[d.cariSesi(entry[5],entry[6])[0]] += 1
         testX.append(entry[3])
     
     testX = counterList[index].transform(transform(testX))
