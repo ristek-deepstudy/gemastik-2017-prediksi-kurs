@@ -1,9 +1,11 @@
 # TODO: Documentation!!
 
-from Database import Database
-import sys
-import sqlite3
 import random
+import sqlite3
+import sys
+import settings
+from Database import Database
+from Models import Boosting, Neighbors
 
 # TODO: check package, exit if module not found
 try:
@@ -35,52 +37,11 @@ except(ModuleNotFoundError):
     print("Close program")
     sys.exit()
     
+# =========================================================
+
 # TODO: add DEBUG MODE PARAMETER, if DEBUG MODE == True, print() on
-# TODO: Merapihkan string berida.db menjadi static di satu file setting sehingga lebih globally
-# TODO: Refactor semua file yang memanggil berita.db menjadi ke static variable di file setting
-# TODO: refactor, static var, const, functions on the top, class then, and __main__
-conn = sqlite3.connect('berita.db')
-c = conn.cursor()
-c.execute("SELECT Text,Date,Clock,Sentiment From Berita ")
-result = c.fetchall()
 
-# TODO: implement tqdm
-# TODO: change: var d with db
-d = Database()
-data = {}
-label = {}
-
-# TODO: change: var I with something meaningful
-for I in result:
-    session = d.cariSesi(I[1],I[2])[0]
-    if session not in data:
-        data[session] = []
-        label[session] = I[3]
-    sentence = I[0]
-    newSentence = ""
-
-    # TODO: change: var J with something meaningful
-    for J in sentence:
-        if J.isalpha():
-            newSentence += J
-        else:
-            newSentence += " "
-    data[session].append(newSentence)
-
-# Sorting the chronological order
-#MeTooLazySoMeBubbleSort
-# TODO: sorting bubble log N^2, change to NlogN algorithm
-chronology = list(data.keys())
-
-for I in range(len(data.keys())):
-    for J in range(I+1,len(data.keys())):
-        if chronology[I] > chronology[J]:
-            chronology[I],chronology[J] = chronology[J],chronology[I]
-
-# TODO: DEBUG MODE
-print(len(chronology))
-
-def balancedTrain(X,y,mode):
+def balanced_train(X, y, mode):
     '''
     mode has two options:
     -> 'CV'
@@ -92,38 +53,41 @@ def balancedTrain(X,y,mode):
     boosting    
     '''
     assert mode == 'CV' or mode == 'Boosting'
+
     balancedX = []
     balancedY = []
-    
     index = {}
+
+    len_X, len_y = len(X), len(y)
     
     # TODO: chanege: len(X) len(Y) to variable then process it
-    assert len(X) == len(y)
-    
+    assert len_X == len_y
+
+    # TODO: can be a function
     #Mencatat indeks mana yang positif dan mana yang negatif
-    # TODO: change to something meaningful
-    for I in range(len(X)):
-        if y[I] not in index:
-            index[y[I]] = []
-        index[y[I]].append(I)
+    for i in range(len_X):
+        if y[i] not in index:
+            index[y[i]] = []
+        index[y[i]].append(i)
     
-    minimumPoint = min([len(I) for I in index.values()])    
-    
+    minimum_point = min([len(i) for i in index.values()])
+
+    #TODO: can be a function
     #Memastikan jumlah (+) dan (-) sama
-    # TODO: change to something meaningful
-    for I in index:
+    for i in index:
         if mode == 'CV':
-            chosen = random.sample(index[I],minimumPoint)
+            chosen = random.sample(index[i],minimum_point)
         else:
-            chosen = random.choices(index[I],k=minimumPoint)
-        # TODO: change to something meaningful
-        for J in chosen:
-            balancedX.append(X[J])
-            balancedY.append(y[J])
+            chosen = random.choices(index[i],k=minimum_point)
+
+        for j in chosen:
+            balancedX.append(X[j])
+            balancedY.append(y[j])
+
     return balancedX, balancedY
 
 # TODO: Clean this function
-def splitGroup(kFold):
+def split_group(kFold, X, y):
     #Me too lazy to plug in sklearn
     assert len(X) == len(y)
     index = [int(I) for I in range(len(X))]
@@ -131,39 +95,8 @@ def splitGroup(kFold):
     group = [index[len(index)*I//kFold:len(index)*(I+1)//kFold] for I in range(kFold)]
     return group
 
-# TODO: move class to the first line
-#Custom class for GradientBoosting
-class Boosting():
-    def __init__(self):
-        self.clf = GB()
-    def fit(self,X,y):
-        self.clf.fit(X,y)
-    def predict(self,X):
-        m = int(X.shape[0] ** (0.5))
-        pred = []
-        for I in range(m):
-            pred.extend(self.clf.predict(X[I*X.shape[0]//m:(I+1)*X.shape[0]//m].toarray()))
-        return pred
-
-#Custom class for K Nearest Neighbor
-class Neighbors:
-    def __init__(self):
-        self.clf = KNC()
-    def fit(self,X,y):
-        self.clf.fit(X,y)
-    def predict(self,X):
-        m = int(X.shape[0] ** (0.5))
-        pred = []
-        for I in range(m):
-            pred.extend(self.clf.predict(X[I*X.shape[0]//m:(I+1)*X.shape[0]//m]))
-        return pred
-
-# TODO: clean this lines
-clfOption = [Boosting(),LR(n_jobs = -1),NB(),LinearSVC(),Neighbors(),RFC()]
-mrePred = []
-
 # TODO: clean this function
-def mrc(pred,Y):
+def mrc(pred, Y):
     
     pred = array(pred)
     Y    = array(Y)
@@ -181,113 +114,188 @@ def mrc(pred,Y):
                 FP += 1
             else:
                 FN += 1
+
     #print(TP,FP,TN,FN)
     try:
         return ((TP*TN)-(FP*FN)) / ((TP+FP)*(TP+FN)*(TN+FP)*(TN+FN))**(0.5)
     except:
         return 0
 
-# TODO: this needs to move to some function := easy to debug
-# TODO: clean this lines from some unmeaningful variable name
-mrePred = []
-for index in range(5):
-    mreTotal = []
-    trainChronology = chronology[:len(chronology)*(index+1)//6]
-    testChronology  = chronology[len(chronology)*(index+1)//6:len(chronology)*(index+2)//6]
-    
-    # Do cross-validation to choose the best feature selection
-    
-    X = []
-    y = []
-    
-    for I in trainChronology:
-        X.extend(data[I])
-        y.extend([label[I] for J in range(len(data[I]))])
-        
-    group = splitGroup(5)
-    XkFold = [[X[J] for J in K]for K in group]
-    YkFold = [[y[J] for J in K]for K in group]
-    counterList = []
-    selectList = []
-    mreTotal = []
 
-    xTrain = []
-    yTrain = []
-    
-    xTest  = []
-    yTest = []
-    
-    for J in range(5):
-        if J == index:
-            for L in XkFold[J]:
-                xTest.append(L)
-            yTest.extend(YkFold[J])
-        else:
-            for L in XkFold[J]:
-                xTrain.append(L)
-            yTrain.extend(YkFold[J])
 
-    assert len(xTrain) == len(yTrain)
-    xTrainNew , yTrainNew = balancedTrain(xTrain,yTrain,'CV')
-    counterList.append(TV(ngram_range=(2,2),min_df=5)) 
-    trainVector = counterList[-1].fit_transform(xTrainNew)
-    testVector  = counterList[-1].transform(xTest)
-    
-    selectList.append(SelectKBest(chi2, k = 10000))
-    
-    trainVector = selectList[-1].fit_transform(trainVector,yTrainNew)
-    testVector  = selectList[-1].transform(testVector)
+def main():
 
-    mreTotal.append(0)
-    for J in clfOption:
-        J.fit(trainVector,yTrainNew)
-        prediction = J.predict(testVector)
-        mreTotal[-1] += mrc(prediction,yTest)
-    
-    index = mreTotal.index(max(mreTotal))
-    
-    mrePred.append({'post':[],
-                    'chronological':[]})
-    
-    xTrainNew = []
-    yTrainNew = []
-    # Generating boosting data
-    for I in range(9):
-        X_temp , y_temp = balancedTrain(xTrain,yTrain,'Boosting')
-        xTrainNew.append(X_temp)
-        yTrainNew.append(y_temp)
+    # path for db in settings.py
+    DB_PATH = settings.DATABASES['default']['PATH']
 
-    trainVector = [counterList[index].transform(I) for I in xTrainNew]
-    testVector  = counterList[index].transform(xTest)
+    # create connection
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT Text,Date,Clock,Sentiment From Berita ")
+    result = c.fetchall()
+
+    # TODO: change: var d with db
+    db = Database(DB_PATH)
+    data = {}
+    label = {}
+
+    # TODO: implement tqdm
+    # TODO: change: var I with something meaningful
+    # Load data from db after fetch
+    for i in tqdm(range(len(result))):
+        res = result[i]
+        sess = db.find_session(res[1], res[2])[0]
+
+        if sess not in data:
+            data[sess] = []
+            label[sess] = res[3]
         
-    trainVector = [selectList[index].transform(I) for I in trainVector]
-    testVector  = selectList[index].transform(testVector)
-    
-    for I in clfOption:
-        predict = array([int(0) for J in yTest])
-        for boostingIter in range(9):
-            I.fit(trainVector[boostingIter],yTrainNew[boostingIter])
-            predict += I.predict(testVector)
-        postPredict = [[-1,1][J>0] for J in predict]
+        sentence = res[0]
+        new_sentence = ""
+
+        for word in sentence:
+            if word.isalpha():
+                new_sentence += word
+            else:
+                new_sentence += " "
+
+        data[sess].append(new_sentence)
+
+    # Sorting the chronological order
+    chronology = list(data.keys())
+    chronology.sort()
+
+    if settings.DEBUG_MODE == True:
+        print("|Chronology|: ", len(chronology))
+
+    clf_option = [
+        Boosting(),
+        LR(n_jobs = -1),
+        NB(),
+        LinearSVC(),
+        Neighbors(),
+        RFC()]
+
+    mre_pred = []
+
+    for index in range(5):
+
+        train_chronology = chronology[:len(chronology)*(index+1)//6]
+        test_chronology  = chronology[len(chronology)*(index+1)//6:len(chronology)*(index+2)//6]
         
-        dayPredict = []
-        dayY = []
-        sumIndex = 0
+        # Do cross-validation to choose the best feature selection
+        X = []
+        y = []
         
-        for J in testChronology:
-            dayPredict.append([-1,1][sum(postPredict[sumIndex:sumIndex+len(data[J])])>0])
-            dayY.append(label[J])
-            sumIndex += len(data[J])
+        for i in train_chronology:
+            X.extend(data[i])
+            y.extend([label[i] for j in range(len(data[i]))])
             
-        mrePred[-1]['post'].append(mrc(postPredict,yTest))
-        mrePred[-1]['chronological'].append(mrc(dayPredict,dayY))
+        group = split_group(5)
+
+        X_Kfold = [[X[j] for j in k]for k in group]
+        y_Kfold = [[y[j] for j in k]for k in group]
+
+        counter_list = []
+        select_list = []
+        mre_total = []
+
+        X_train = []
+        y_train = []
+        
+        X_test  = []
+        y_test = []
+        
+        for j in range(5):
+            if j == index:
+                for l in X_Kfold[j]:
+                    X_test.append(l)
+
+                y_test.extend(y_Kfold[l])
+
+            else:
+                for l in X_Kfold[j]:
+                    X_train.append(l)
+
+                y_train.extend(y_Kfold[j])
+
+        assert len(X_train) == len(y_train)
+
+        X_train_new, y_train_new = balanced_train(X_train, y_train, 'CV')
+
+        counter_list.append(
+            TV(ngram_range=(2, 2), min_df=5)
+        )
+        train_vector = counter_list[-1].fit_transform(X_train_new)
+        test_vector  = counter_list[-1].transform(X_test)
+        
+        select_list.append(
+            SelectKBest(chi2, k = 10000)
+        )
+        train_vector = select_list[-1].fit_transform(train_vector, y_train_new)
+        test_vector  = select_list[-1].transform(test_vector)
+
+        mre_total.append(0)
+
+        for opt in clf_option:
+            opt.fit(train_vector, y_train_new)
+            #
+            prediction = opt.predict(test_vector)
+            #
+            mre_total[-1] += mrc(prediction,y_test)
+        
+        index = mre_total.index(max(mre_total))
+        
+        mre_pred.append({'post':[],
+                        'chronological':[]})
+        
+        X_train_new, y_train_new = [],[]
+
+        # Generating boosting data
+        for i in range(9):
+            X_temp , y_temp = balanced_train(X_train, y_train, 'Boosting')
+
+            X_train_new.append(X_temp)
+            y_train_new.append(y_temp)
+
+        train_vector = [counter_list[index].transform(I) for I in X_train_new]
+        test_vector  = counter_list[index].transform(X_test)
+            
+        train_vector = [select_list[index].transform(I) for I in train_vector]
+        test_vector  = select_list[index].transform(test_vector)
+        
+        for opt in clf_option:
+            predict = array([int() for j in y_test])
+
+            BOOSTING_ITER = 9
+            for jj in range(BOOSTING_ITER):
+                opt.fit(train_vector[jj],y_train_new[jj])
+                predict += opt.predict(test_vector)
+
+            post_predict = [[-1, 1][j > 0] for j in predict]
+
+            day_predict = []
+            day_y = []
+            sum_index = 0
+
+            for j in test_chronology:
+                day_predict.append([-1, 1][sum(post_predict[sum_index : sum_index + len( data[j] )]) > 0])
+                day_y.append(label[j])
+                sum_index += len(data[j])
+                
+            mre_pred[-1]['post'].append(mrc(post_predict,y_test))
+            mre_pred[-1]['chronological'].append(mrc(day_predict,day_y))
 
 
-# TODO: Change var name to something meaningful and move to the top and make it static var
-name = ["Gradient Boosting","Logistic Regression","Naive Bayes","Linear SVC","K nearest neighbor","Random forest"]
+    # TODO: Change var name to something meaningful and move to the top and make it static var
+    name = ["Gradient Boosting","Logistic Regression","Naive Bayes","Linear SVC","K nearest neighbor","Random forest"]
 
-# TODO: move this loop to single function so easy to debug and read
-for I in range(len(name)):
-    chronological = [J['chronological'][I] for J in mrePred]
-    post = [J['post'][I] for J in mrePred]
-    print("%s -> (chronological) %f (post) %f " % (name[I],sum(chronological)/5,sum(post)/5))
+    # TODO: move this loop to single function so easy to debug and read
+    for i in range(len(name)):
+        chronological = [j['chronological'][i] for j in mre_pred]
+        post = [j['post'][i] for j in mre_pred]
+
+        print("%s -> (chronological) %f (post) %f " % (name[I],sum(chronological)/5,sum(post)/5))
+
+if "__main__" == __name__:
+    main()

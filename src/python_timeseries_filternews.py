@@ -342,7 +342,7 @@ def main():
     label = {}
 
     for I in result:
-        session = db.cariSesi(I[1],I[2])[0]
+        session = db.find_session(I[1], I[2])[0]
         if session not in data:
             data[session] = []
             label[session] = I[3]
