@@ -12,3 +12,10 @@ DATABASES = {
         'PATH': BASE_DIR + '/db/berita.db'
     }
 }
+
+ALGORITHM = ["Gradient Boosting",
+            "Logistic Regression",
+            "Naive Bayes",
+            "Linear SVC",
+            "K nearest neighbor",
+            "Random forest"]

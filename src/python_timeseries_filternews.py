@@ -1,375 +1,248 @@
-# TODO: Dokumentasi
-# TODO: check package
-# TODO: mode debugging akan menyalakan print, DEBUG_MODE==True, print on
-
-from sklearn.feature_selection import SelectKBest
-from sklearn.feature_selection import chi2
-from sklearn.linear_model import LogisticRegression as LR
-from sklearn.feature_extraction.text import CountVectorizer as CV
-from sklearn.ensemble.gradient_boosting import GradientBoostingClassifier as GB
-from sklearn.ensemble import RandomForestClassifier as RFC
-from sklearn.svm import LinearSVC
-from sklearn.neighbors import KNeighborsClassifier as KNC
-from Database import Database
-from numpy import array
-from sklearn.naive_bayes import MultinomialNB as NB
 import sqlite3
-import tqdm
-import random
+import sys
 
-# TODO: change: lebih static nanti menggunakan file setting.py sehingga terpusat
-conn = sqlite3.connect('berita.db')
-c = conn.cursor()
-c.execute("SELECT Text,Date,Clock,Sentiment From Berita ")
-result = c.fetchall()
+import settings
+from Database import Database
+from Models import transform, mrc, split_group, balanced_train, Boosting, Neighbors, clean_text
 
-# TODO: menunggu refactor database
-# TODO: use meaningful name for variable
-d = Database()
-data = {}
-label = {}
-for I in result:
-    session = d.cariSesi(I[1], I[2])[0]
-    if session not in data:
-        data[session] = []
-        label[session] = I[3]
-    sentence = I[0]
-    newSentence = ""
-    for J in sentence:
-        if J.isalpha():
-            newSentence += J
-        else:
-            newSentence += " "
-    data[session].append(newSentence)
+try:
+    from sklearn.feature_selection import SelectKBest
+    from sklearn.feature_selection import chi2
+    from sklearn.linear_model import LogisticRegression as LR
+    from sklearn.feature_extraction.text import TfidfVectorizer as TV
+    from sklearn.ensemble import RandomForestClassifier as RFC
+    from sklearn.naive_bayes import MultinomialNB as NB
+    from sklearn.svm import LinearSVC
+    from sklearn.feature_extraction.text import CountVectorizer as CV
+except(ModuleNotFoundError):
+    print("Excecption: Scikit-learn package not found")
+    print("Close program")
+    sys.exit()
 
-# TODO: change sorting algorithm to NlogN algorithm using new class
-# Sorting the chronological order
-# MeTooLazySoMeBubbleSort
+try:
+    from numpy import array
+except(ModuleNotFoundError):
+    print("Excecption: 'numpy' package not found")
+    print("Close program")
+    sys.exit()
 
-chronology = list(data.keys())
+try:
+    from tqdm import tqdm
+except(ModuleNotFoundError):
+    print("Excecption: 'tqdm' package not found")
+    print("Close program")
+    sys.exit()
 
-for I in range(len(data.keys())):
-    for J in range(I + 1, len(data.keys())):
-        if chronology[I] > chronology[J]:
-            chronology[I], chronology[J] = chronology[J], chronology[I]
+# =========================================================
+if __name__ == '__main__':
+    # TODO: change: lebih static nanti menggunakan file setting.py sehingga terpusat
+    DB_PATH = settings.DATABASES['default']['PATH']
 
-date = [chronology[len(chronology) * I // 6 - 1] for I in range(1, 7)]
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT Text,Date,Clock,Sentiment From Berita ")
+    result = c.fetchall()
 
+    db = Database(DB_PATH)
+    data = {}
+    label = {}
+    for i in tqdm(range(len(result))):
+        res = result[i]
+        sess = db.find_session(res[1], res[2])[0]
 
-def balancedTrain(X, y, mode):
-    '''
-    mode has two options:
-    -> 'CV'
-    then balancedTrain would suit it undersampling method for
-    cross validation
-
-    -> 'Boosting'
-    then balancedTrain would suit is sampling method for
-    boosting
-    '''
-    assert mode == 'CV' or mode == 'Boosting'
-    balancedX = []
-    balancedY = []
-
-    index = {}
-
-    assert len(X) == len(y)
-
-    # TODO: meaningful name for variable di lines function ini
-
-    # Mencatat indeks mana yang positif dan mana yang negatif
-    for I in range(len(X)):
-        if y[I] not in index:
-            index[y[I]] = []
-        index[y[I]].append(I)
-
-    minimumPoint = min([len(I) for I in index.values()])
-
-    # Memastikan jumlah (+) dan (-) sama
-    for I in index:
-        if mode == 'CV':
-            chosen = random.sample(index[I], minimumPoint)
-        else:
-            chosen = random.choices(index[I], k=minimumPoint)
-        for J in chosen:
-            balancedX.append(X[J])
-            balancedY.append(y[J])
-    return balancedX, balancedY
-
-
-def transform(text):
-    # TODO: dokumentasi
-    listNews = []
-    for news in text:
-        listSentence = []
-        oldText = news
-        while True:
-            newText = oldText.replace("  ", " ")
-            if oldText == newText:
-                break
-            oldText = newText
-        listSentence.extend(newText)
-        splitText = newText.split(" ")
-        listSentence.append(" ".join([splitText[I] for I in range(0, len(splitText), 2)]))
-        listSentence.append(" ".join([splitText[I] for I in range(1, len(splitText), 2)]))
-        listNews.append(" SNIP ".join(listSentence))
-    return listNews
-
-
-def splitGroup(kFold):
-    # TODO: dokumentasi
-    # Me too lazy to plug in sklearn
-    assert len(X) == len(y)
-    index = [int(I) for I in range(len(X))]
-    random.shuffle(index)
-
-    # TODO: clean this line
-    group = [index[len(index) * I // kFold:len(index) * (I + 1) // kFold] for I in range(kFold)]
-    return group
-
-
-# Custom class for GradientBoosting
-class Boosting():
-    # TODO: dokumentasi
-    def __init__(self):
-        self.clf = GB()
-
-    def fit(self, X, y):
-        self.clf.fit(X, y)
-
-    def predict(self, X):
-        m = int(X.shape[0] ** (0.5))
-        pred = []
-        for I in range(m):
-            pred.extend(self.clf.predict(X[I * X.shape[0] // m:(I + 1) * X.shape[0] // m].toarray()))
-        return pred
-
-
-# Custom class for K Nearest Neighbor
-class Neighbors:
-    # TODO: dokumentasi
-    def __init__(self):
-        self.clf = KNC()
-
-    def fit(self, X, y):
-        self.clf.fit(X, y)
-
-    def predict(self, X):
-        m = int(X.shape[0] ** (0.5))
-        pred = []
-        # TODO: Clean these lines
-        for I in range(m):
-            pred.extend(self.clf.predict(X[I * X.shape[0] // m:(I + 1) * X.shape[0] // m]))
-        return pred
-
-
-def bersihkanTeksBerita(array):
-    # TODO: dokumentasi dan meaningful name
-    hasil = []
-    for news in array:
-        newSentence = ""
-        for J in news:
-            if J.isalpha():
-                newSentence += J
+        if sess not in data:
+            data[sess] = []
+            label[sess] = res[3]
+        sentence = res[0]
+        new_sentence = ""
+        for j in sentence:
+            if j.isalpha():
+                new_sentence += j
             else:
-                newSentence += " "
-        hasil.append(newSentence)
-    return hasil
+                new_sentence += " "
+        data[sess].append(new_sentence)
+
+    chronology = list(data.keys())
+
+    for i in range(len(data.keys())):
+        for j in range(i + 1, len(data.keys())):
+            if chronology[i] > chronology[j]:
+                chronology[i], chronology[j] = chronology[j], chronology[i]
+
+    date = [chronology[len(chronology) * i // 6 - 1] for i in range(1, 7)]
+
+    clf_option = [
+            Boosting(),
+            LR(n_jobs=-1),
+            NB(), LinearSVC(),
+            Neighbors(),
+            RFC()
+         ]
+    mre_pred = []
+
+    for iter in tqdm(range(5)):
+        query = "Select * from berita WHERE Date <= " + str(date[iter]) + " AND Title LIKE '%ekono%' "
+        c.execute(query)
+        train_data = c.fetchall()
+
+        query = "Select * from berita WHERE Date <= " + str(date[iter]) + " AND NOT Title LIKE '%ekono%' "
+        c.execute(query)
+        train_data_unknown = c.fetchall()
+
+        query = "Select * from berita WHERE Date <= " + str(date[iter + 1]) + " AND " + str(
+            date[iter]) + "< Date AND NOT Title LIKE '%ekono%' "
+        c.execute(query)
+        test_data = c.fetchall()
+
+        if settings.ALGORITHM:
+            print("Data berhasil difetch")
+            print("Data Train Unknown: %d Data Train: %d Data Test: %d" %
+                        (len(train_data_unknown), len(train_data), len(test_data)))
+
+        filtered = []
+        for i in range(0, len(train_data_unknown), len(train_data)):
+            X = [j[3] for j in train_data]
+            y = [int(1) for j in train_data]
+            to_evaluate = [j[3] for j in train_data_unknown[i:i + len(train_data)]]
+            X += to_evaluate
+            y += [int(0) for j in to_evaluate]
+
+            counter = CV()
+            vector = counter.fit_transform(clean_text(X))
+            to_evaluate_vector = counter.transform(clean_text(to_evaluate))
+
+            bayes = NB()
+            bayes.fit(vector, y)
+            predict = bayes.predict_proba(to_evaluate_vector)
+
+            for j in range(len(predict)):
+                if predict[j][1] > 0.9:
+                    filtered.append(train_data_unknown[i + j])
+
+        if settings.DEBUG_MODE:
+            print("Data berhasil difilter")
+            print("Data Filtered: ", len(filtered))
+
+        train_data += filtered
+
+        # Do cross-validation to choose the best feature selection
+        X = []
+        y = []
+
+        for i in train_data:
+            X.append(i[3])
+            y.append(i[7])
+
+        group = split_group(5, X=X, y=y)
+        X_kFold = [[X[j] for j in k] for k in group]
+        y_kFold = [[y[j] for j in k] for k in group]
+        counter_list = []
+        select_list = []
+        mre_total = []
+
+        for i in range(5):
+            X_train = []
+            y_train = []
+
+            X_test = []
+            y_test = []
+
+            for j in range(5):
+                if j == i:
+                    for l in X_kFold[j]:
+                        X_test.append(l)
+                    y_test.extend(y_kFold[j])
+
+                else:
+                    for l in X_kFold[j]:
+                        X_train.append(l)
+                    y_train.extend(y_kFold[j])
+
+            X_train = transform(X_train)
+            X_test = transform(X_test)
+
+            assert len(X_train) == len(y_train)
+
+            X_train_new, y_train_new = balanced_train(X_train, y_train, 'CV')
+            counter_list.append(CV(ngram_range=(2, 2), min_df=5))
+            train_vector = counter_list[-1].fit_transform(X_train_new)
+            test_vector = counter_list[-1].transform(X_test)
+
+            select_list.append(SelectKBest(chi2, k=min(10000, train_vector.shape[1])))
+
+            train_vector = select_list[-1].fit_transform(train_vector, y_train_new)
+            test_vector = select_list[-1].transform(test_vector)
+
+            mre_total.append(0)
+            for j in clf_option:
+                j.fit(train_vector, y_train_new)
+                prediction = j.predict(test_vector)
+                mre_total[-1] += mrc(prediction, y_test)
+
+        index = mre_total.index(max(mre_total))
+
+        mre_pred.append({'post': [],
+                        'chronological': []})
+
+        X_train_new = []
+        y_train_new = []
+        # Generating boosting data
+        for i in range(5):
+            #TODO: BUGS = is X_train, y_train should be X, y???
+            X_temp, y_temp = balanced_train(X_train, y_train, 'Boosting')
+            X_train_new.append(X_temp)
+            y_train_new.append(y_temp)
+
+        train_vector = [counter_list[index].transform(i) for i in X_train_new]
+        train_vector = [select_list[index].transform(i) for i in train_vector]
+
+        # Create the test set of chronological entries
+
+        length_of_test_data = {}
+        test_X = []
+        data_y = {}
+
+        for entry in test_data:
+            if entry[5] not in length_of_test_data:
+                length_of_test_data[entry[5]] = 0
+                data_y[entry[5]] = entry[7]
+
+            length_of_test_data[entry[5]] += 1
+            test_X.append(entry[3])
+
+        test_X = counter_list[index].transform(transform(test_X))
+        test_vector = select_list[index].transform(test_X)
+
+        if settings.DEBUG_MODE:
+            print("Mulai training")
+
+        for i in clf_option:
+            post_predict = array([int(0) for J in range(test_vector.shape[0])])
+            for boosting_iter in range(5):
+                i.fit(train_vector[boosting_iter], y_train_new[boosting_iter])
+                post_predict += i.predict(test_vector)
+            post_predict = [[-1, 1][J > 0] for J in post_predict]
+
+            day_predict = []
+            post_y = []
+            day_y = []
+            sum_index = 0
+
+            for dateTested in length_of_test_data:
+                day_predict.append([-1, 1][sum(post_predict[sum_index:sum_index + length_of_test_data[dateTested]]) > 0])
+                post_y.extend([data_y[dateTested] for I in range(length_of_test_data[dateTested])])
+                day_y.append(data_y[dateTested])
+                sum_index += length_of_test_data[dateTested]
+
+            mre_pred[-1]['post'].append(mrc(post_predict, post_y))
+            mre_pred[-1]['chronological'].append(mrc(day_predict, day_y))
 
 
-clfOption = [Boosting(), LR(n_jobs=-1), NB(), LinearSVC(), Neighbors(), RFC()]
-mrePred = []
+    if settings.DEBUG_MODE:
+        print("mre_prediction: ", mre_pred)
 
-
-def mrc(pred, Y):
-    # TODO: dokumentasi dan meaningful name
-    assert len(pred) == len(Y)
-    pred = array(pred)
-    Y = array(Y)
-
-    TP, FP, TN, FN = 0, 0, 0, 0
-
-    for I in range(len(pred)):
-        if pred[I] == Y[I]:
-            if pred[I] == 1:
-                TP += 1
-            else:
-                TN += 1
-        else:
-            if pred[I] == -1:
-                FP += 1
-            else:
-                FN += 1
-    print(TP, FP, TN, FN)
-    try:
-        return ((TP * TN) - (FP * FN)) / ((TP + FP) * (TP + FN) * (TN + FP) * (TN + FN)) ** (0.5)
-    except:
-        return 0
-
-
-# TODO: should del this stucture?
-del result
-
-# TODO: DEBUG MODE
-# TODO: ada baiknya lines ke bawah ini pake function per tugas jadi debug lebih mudah
-mrePred = []
-for iter in range(5):
-    mreTotal = []
-    query = "Select * from berita WHERE Date <= " + str(date[iter]) + " AND Title LIKE '%ekono%' "
-    c.execute(query)
-    trainData = c.fetchall()
-
-    query = "Select * from berita WHERE Date <= " + str(date[iter]) + " AND NOT Title LIKE '%ekono%' "
-    c.execute(query)
-    trainDataUnknown = c.fetchall()
-
-    query = "Select * from berita WHERE Date <= " + str(date[iter + 1]) + " AND " + str(
-        date[iter]) + "< Date AND NOT Title LIKE '%ekono%' "
-    c.execute(query)
-    testData = c.fetchall()
-
-    print("Data berhasil difetch")
-    print(len(trainDataUnknown), len(trainData), len(testData))
-    filtered = []
-
-    # TODO: meaningful names
-    for I in range(0, len(trainDataUnknown), len(trainData)):
-        X = [J[3] for J in trainData]
-        y = [int(1) for J in trainData]
-        toEvaluate = [J[3] for J in trainDataUnknown[I:I + len(trainData)]]
-        X += toEvaluate
-        y += [int(0) for J in toEvaluate]
-
-        counter = CV()
-        vector = counter.fit_transform(bersihkanTeksBerita(X))
-        toEvaluateVector = counter.transform(bersihkanTeksBerita(toEvaluate))
-
-        bayes = NB()
-        bayes.fit(vector, y)
-        predict = bayes.predict_proba(toEvaluateVector)
-
-        for J in range(len(predict)):
-            if predict[J][1] > 0.9:
-                filtered.append(trainDataUnknown[I + J])
-
-    print("Data berhasil difilter")
-
-    trainData += filtered
-    print(len(filtered))
-    # Do cross-validation to choose the best feature selection
-
-    X = []
-    y = []
-
-    for I in trainData:
-        X.append(I[3])
-        y.append(I[7])
-
-    group = splitGroup(5)
-    XkFold = [[X[J] for J in K] for K in group]
-    YkFold = [[y[J] for J in K] for K in group]
-    counterList = []
-    selectList = []
-    mreTotal = []
-
-    for I in range(5):
-        xTrain = []
-        yTrain = []
-
-        xTest = []
-        yTest = []
-        for J in range(5):
-            if J == I:
-                for L in XkFold[J]:
-                    xTest.append(L)
-                yTest.extend(YkFold[J])
-            else:
-                for L in XkFold[J]:
-                    xTrain.append(L)
-                yTrain.extend(YkFold[J])
-
-        xTrain = transform(xTrain)
-        xTest = transform(xTest)
-
-        assert len(xTrain) == len(yTrain)
-        xTrainNew, yTrainNew = balancedTrain(xTrain, yTrain, 'CV')
-        counterList.append(CV(ngram_range=(2, 2), min_df=5))
-        trainVector = counterList[-1].fit_transform(xTrainNew)
-        testVector = counterList[-1].transform(xTest)
-
-        selectList.append(SelectKBest(chi2, k=min(10000, trainVector.shape[1])))
-
-        trainVector = selectList[-1].fit_transform(trainVector, yTrainNew)
-        testVector = selectList[-1].transform(testVector)
-
-        mreTotal.append(0)
-        for J in clfOption:
-            J.fit(trainVector, yTrainNew)
-            prediction = J.predict(testVector)
-            mreTotal[-1] += mrc(prediction, yTest)
-
-    index = mreTotal.index(max(mreTotal))
-
-    mrePred.append({'post': [],
-                    'chronological': []})
-
-    xTrainNew = []
-    yTrainNew = []
-    # Generating boosting data
-    for I in range(5):
-        X_temp, y_temp = balancedTrain(xTrain, yTrain, 'Boosting')
-        xTrainNew.append(X_temp)
-        yTrainNew.append(y_temp)
-
-    trainVector = [counterList[index].transform(I) for I in xTrainNew]
-    trainVector = [selectList[index].transform(I) for I in trainVector]
-
-    # Create the test set of chronological entries
-
-    lengthOfTestData = {}
-    testX = []
-    dataY = {}
-
-    for entry in testData:
-        if entry[5] not in lengthOfTestData:
-            lengthOfTestData[entry[5]] = 0
-            dataY[entry[5]] = entry[7]
-        lengthOfTestData[entry[5]] += 1
-        testX.append(entry[3])
-
-    testX = counterList[index].transform(transform(testX))
-    testVector = selectList[index].transform(testX)
-    print("Mulai training")
-    for I in clfOption:
-        postPredict = array([int(0) for J in range(testVector.shape[0])])
-        for boostingIter in range(5):
-            I.fit(trainVector[boostingIter], yTrainNew[boostingIter])
-            postPredict += I.predict(testVector)
-        postPredict = [[-1, 1][J > 0] for J in postPredict]
-
-        dayPredict = []
-        postY = []
-        dayY = []
-        sumIndex = 0
-
-        for dateTested in lengthOfTestData:
-            dayPredict.append([-1, 1][sum(postPredict[sumIndex:sumIndex + lengthOfTestData[dateTested]]) > 0])
-            postY.extend([dataY[dateTested] for I in range(lengthOfTestData[dateTested])])
-            dayY.append(dataY[dateTested])
-            sumIndex += lengthOfTestData[dateTested]
-
-        mrePred[-1]['post'].append(mrc(postPredict, postY))
-        mrePred[-1]['chronological'].append(mrc(dayPredict, dayY))
-# TODO:====== till this line, ada baiknya gunakan function spesifik===========
-
-# TODO: if __main__
-
-name = ["Gradient Boosting", "Logistic Regression", "Naive Bayes", "Linear SVC", "K nearest neighbor", "Random forest"]
-for I in range(len(name)):
-    chronological = [J['chronological'][I] for J in mrePred]
-    post = [J['post'][I] for J in mrePred]
-    print("%s -> (chronological) %f (post) %f " % (name[I], sum(chronological) / 5, sum(post) / 5))
-
-print(mrePred)
-print(trainVector.shape[1])
-print(testX[0])
+    for i in range(len(settings.ALGORITHM)):
+        chronological = [j['chronological'][i] for j in mre_pred]
+        post = [j['post'][i] for j in mre_pred]
+        print("%s -> (chronological) %f (post) %f " %
+              (settings.ALGORITHM[i], sum(chronological) / 5, sum(post) / 5))

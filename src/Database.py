@@ -5,6 +5,9 @@ import requests
 from warnings import warn
 from Worker import Worker
 
+def load_data_from_database(DB_path):
+    pass
+
 class Database:
     def __init__(self, db_path):
         self.conn = sqlite3.connect(db_path)
