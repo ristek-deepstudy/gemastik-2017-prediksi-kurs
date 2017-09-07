@@ -1,6 +1,5 @@
 import sqlite3
 import sys
-
 import settings
 from Database import Database
 from Models import transform, mrc, split_group, balanced_train, Boosting, Neighbors, clean_text

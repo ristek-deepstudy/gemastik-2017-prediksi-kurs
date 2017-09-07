@@ -1,0 +1,4 @@
+scikit-learn==0.18.1              
+tqdm==4.15.0
+pylint==1.7.2
+beautifulsoup4==4.6.0
