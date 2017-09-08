@@ -236,7 +236,7 @@ for iter in range(5):
         predict = bayes.predict_proba(toEvaluateVector)
     
         for J in range(len(predict)):
-            if predict[J][1] > 0.9:
+            if predict[J][1] > 0.75:
                 filtered.append(trainDataUnknown[I+J])
     
     print("Data berhasil difilter")
@@ -358,5 +358,3 @@ for I in range(len(name)):
     print("%s -> (chronological) %f (post) %f " % (name[I],sum(chronological)/5,sum(post)/5))
 
 print(mrePred)
-print(trainVector.shape[1])
-print(testX[0])
