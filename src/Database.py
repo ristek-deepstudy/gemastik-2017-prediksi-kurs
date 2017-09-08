@@ -5,11 +5,15 @@ import requests
 from warnings import warn
 from Worker import Worker
 
+def load_data_from_database(DB_path):
+    pass
+
 class Database:
-    def __init__(self):
-        self.conn = sqlite3.connect('berita.db')
+    def __init__(self, db_path):
+        self.conn = sqlite3.connect(db_path)
         self.c = self.conn.cursor()
-    def buatTabel(self):
+
+    def create_table(self):
         try:
             query = """
             CREATE TABLE stem(
@@ -43,7 +47,8 @@ class Database:
             return "Database dibuat"
         except:
             return "Database sudah dibuat"
-    def updateHarga(self):
+
+    def update_price(self):
         #Tambah data entry harga saham
         n = 0
         file = open('harga.csv')
@@ -66,7 +71,8 @@ class Database:
                 n += 1
         self.conn.commit()
         return n
-    def updateBerita(self,beginDate,endDate):
+
+    def update_news(self, beginDate, endDate):
         """
         Tambah data entri berita
 
@@ -109,7 +115,7 @@ class Database:
                 for J in newsList:
                     if J['url'] in result:
                         r = result[J['url']]
-                        nextTwoSession = self.cariSesi(J['tanggal'],J['jam'])
+                        nextTwoSession = self.find_session(J['tanggal'], J['jam'])
                         # Sentimen positif = 1
                         # Sentimen netral = 0
                         # Sentimen negatif = -1
@@ -117,7 +123,7 @@ class Database:
                         # Untuk awal, diasumsikan semua berita ketika harga naik adalah sentimen
                         # positif dan diasumsikan semua berita ketika harga turun adalah
                         # sentimen negatif
-                        sentiment = int(self.bandingIndeks(nextTwoSession)>0)*2 + -1
+                        sentiment = int(self.compare_index(nextTwoSession) > 0) * 2 + -1
                         d = parser.extractData(r)
                         if d != None:
                             self.c.execute("INSERT INTO berita VALUES (?,?,?,?,?,?,?,?)",
@@ -125,7 +131,8 @@ class Database:
                 date += datetime.timedelta(1)
                 worker.reset()
                 self.conn.commit()
-    def bandingIndeks(self,date):
+                
+    def compare_index(self, date):
         '''
         Mengcompare antara harga gabungan indeks saham pada milestone 1
         dan harga gabungan indek saham pada milestone 2
@@ -149,7 +156,8 @@ class Database:
                                 (date[I]))
             mileStoneValue.append(d[0][0])
         return mileStoneValue[1] - mileStoneValue[0]
-    def cariSesi(self,date,clock):
+
+    def find_session(self, date, clock):
         d = datetime.datetime(date//10000,date//100%100,date%100)
         if clock > 945: 
             d += datetime.timedelta(1)
