@@ -245,3 +245,4 @@ if __name__ == '__main__':
         post = [j['post'][i] for j in mre_pred]
         print("%s -> (chronological) %f (post) %f " %
               (settings.ALGORITHM[i], sum(chronological) / 5, sum(post) / 5))
+>>>>>>> 76dc7a8095b1dd019d7c97fa0e67c22d216640b5

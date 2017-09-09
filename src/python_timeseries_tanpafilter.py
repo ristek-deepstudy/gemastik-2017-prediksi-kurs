@@ -113,6 +113,7 @@ if __name__ == '__main__':
         group = split_group(5, X=X, y=y)
         X_kFold = [[X[j] for j in k] for k in group]
         y_kFold = [[y[j] for j in k] for k in group]
+        group.clean()
         counter_list = []
         select_list = []
         mre_total = []
@@ -136,6 +137,8 @@ if __name__ == '__main__':
 
             assert len(X_train) == len(y_train)
             X_train_new , y_train_new = balanced_train(X_train, y_train, 'CV')
+            X_train.clear()
+            y_train.clear()
             counter_list.append(CV(ngram_range=(2, 2), min_df=5))
             train_vector = counter_list[-1].fit_transform(X_train_new)
             test_vector  = counter_list[-1].transform(X_test)
@@ -152,6 +155,11 @@ if __name__ == '__main__':
                 mre_total[-1] += mrc(prediction, y_kFold[testIndex])
 
         index = mre_total.index(max(mre_total))
+        select_counter = counter_list[index]
+        select_feature = select_list[index]
+
+        counter_list.clear()
+        select_list.clear()
 
         mre_pred.append({'post':[],
                         'chronological':[]})
@@ -160,12 +168,16 @@ if __name__ == '__main__':
         y_train_new = []
         # Generating boosting data
         for i in range(5):
-            X_temp , y_temp = balanced_train(X_train, y_train, 'Boosting')
+            X_temp , y_temp = balanced_train(X, y, 'Boosting')
             X_train_new.append(X_temp)
             y_train_new.append(y_temp)
 
-        train_vector = [counter_list[index].transform(I) for I in X_train_new]
-        train_vector = [select_list[index].transform(I) for I in train_vector]
+        X.clear()
+        y.clear()
+
+        train_vector = [select_counter.transform(I) for I in X_train_new]
+        X_train_new.clear()
+        train_vector = [select_list.transform(I) for I in train_vector]
 
         # Create the test set of chronological entries
         length_of_test_data = {}
@@ -179,8 +191,9 @@ if __name__ == '__main__':
             length_of_test_data[db.find_session(entry[5], entry[6])[0]] += 1
             test_X.append(entry[3])
 
-        test_X = counter_list[index].transform(transform(test_X))
-        test_vector = select_list[index].transform(test_X)
+        test_X = select_counter.transform(transform(test_X))
+        test_X.clean()
+        test_vector = select_list.transform(test_X)
 
         if settings.DEBUG_MODE:
             print("Mulai training")
@@ -206,6 +219,10 @@ if __name__ == '__main__':
 
             mre_pred[-1]['post'].append(mrc(post_predict, post_y))
             mre_pred[-1]['chronological'].append(mrc(day_predict, day_y))
+        test_vector.clean()
+        day_predict.clean()
+        post_y.clean()
+        day_y.clean()
 
     for i in range(len(settings.ALGORITHM)):
         chronological = [j['chronological'][i] for j in mre_pred]
