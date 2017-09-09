@@ -4,6 +4,7 @@
 
 import sqlite3
 import sys
+import gc
 import settings
 from Database import Database
 from Models import Boosting, Neighbors, balanced_train, split_group, mrc, transform, clean_text
@@ -73,6 +74,9 @@ if __name__ == '__main__':
 
     date = [chronology[len(chronology) * i // 6-1] for i in range(1,7)]
 
+    del data, label
+    gc.collect()
+
     clf_option = [
         Boosting(),
         LR(n_jobs = -1),
@@ -91,15 +95,15 @@ if __name__ == '__main__':
         mre_total = []
         query = "Select * from berita WHERE Date <= "+str(date[iter])
         c.execute(query)
-        trainData = c.fetchall()
+        train_data = c.fetchall()
 
         query = "Select * from berita WHERE Date <= "+str(date[iter+1])+" AND "+str(date[iter])
         c.execute(query)
         testData = c.fetchall()
 
         # Do cross-validation to choose the best feature selection
-        X = clean_text([i[3] for i in trainData])
-        y = [i[7] for i in trainData]
+        X = clean_text([i[3] for i in train_data])
+        y = [i[7] for i in train_data]
 
         # @TODO Mengurangi memori
 
