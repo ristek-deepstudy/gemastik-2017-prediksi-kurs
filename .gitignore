@@ -87,8 +87,10 @@ celerybeat-schedule
 venv/
 ENV/
 
-# intellij
-./.idea/
+# IDE
+.idea/
+.sonarlint/
+.vscode/
 
 # Spyder project settings
 .spyderproject
