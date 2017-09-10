@@ -1,3 +1,15 @@
+"""
+GEMASTIK 2017
+TIM DEEPSTUDY UNIVERSITAS INDONESIA
+Joseph Jovito | Kerenza Dexolodeo | Wisnu Pramadhitya Ramadhan
+
+Prediksi Fluktuasi Nilai Tukar Mata Uang Melalui Konten Berita Daring
+
+Desc:
+
+"""
+
+
 import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

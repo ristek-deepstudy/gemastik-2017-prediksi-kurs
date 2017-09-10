@@ -1,3 +1,15 @@
+"""
+GEMASTIK 2017
+TIM DEEPSTUDY UNIVERSITAS INDONESIA
+Joseph Jovito | Kerenza Dexolodeo | Wisnu Pramadhitya Ramadhan
+
+Prediksi Fluktuasi Nilai Tukar Mata Uang Melalui Konten Berita Daring
+
+Desc:
+
+"""
+
+
 import sqlite3
 import FileParser
 import datetime

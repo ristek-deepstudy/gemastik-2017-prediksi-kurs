@@ -1,3 +1,15 @@
+"""
+GEMASTIK 2017
+TIM DEEPSTUDY UNIVERSITAS INDONESIA
+Joseph Jovito | Kerenza Dexolodeo | Wisnu Pramadhitya Ramadhan
+
+Prediksi Fluktuasi Nilai Tukar Mata Uang Melalui Konten Berita Daring
+
+Desc:
+
+"""
+
+
 import random
 import sys
 import settings
@@ -26,13 +38,27 @@ except(ModuleNotFoundError):
 
 
 class Boosting():
+    '''
+
+    '''
     def __init__(self):
         self.clf = GB()
 
     def fit(self, X, y):
+        '''
+
+        :param X:
+        :param y:
+        :return:
+        '''
         self.clf.fit(X,y)
 
     def predict(self, X):
+        '''
+
+        :param X:
+        :return:
+        '''
         m = int(X.shape[0] ** (0.5))
         pred = []
         for I in range(m):
@@ -41,13 +67,27 @@ class Boosting():
 
 
 class Neighbors:
+    '''
+
+    '''
     def __init__(self):
         self.clf = KNC()
 
     def fit(self, X, y):
+        '''
+
+        :param X:
+        :param y:
+        :return:
+        '''
         self.clf.fit(X,y)
 
     def predict(self, X):
+        '''
+
+        :param X:
+        :return:
+        '''
         m = int(X.shape[0] ** (0.5))
         pred = []
         for I in range(m):
@@ -130,10 +170,7 @@ def mrc(pred, Y):
     '''
 
     :param pred:
-    , FN = 0,0,0,0
-
-    for I in range(len(pred)):
-        if pre:param Y:
+    :param Y:
     :return:
     '''
     assert len(pred) == len(Y)
@@ -163,7 +200,11 @@ def mrc(pred, Y):
         return 0
 
 def transform(text):
-    # TODO: dokumentasi
+    '''
+
+    :param text:
+    :return:
+    '''
     listNews = []
     for news in text:
         listSentence = []
@@ -182,7 +223,11 @@ def transform(text):
 
 
 def clean_text(array):
-    # TODO: dokumentasi dan meaningful name
+    '''
+
+    :param array:
+    :return:
+    '''
     hasil = []
     for news in array:
         newSentence = ""
