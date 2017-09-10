@@ -21,7 +21,7 @@ use virtualenv.
 ### Prerequisites
 - Python 3.6 Anaconda
 - tqdm
-- db: link
+- db: https://drive.google.com/drive/folders/0B0RLBJxM7gUJYURSRllzOFVrZ3M?usp=sharing
 
 ### Installing
 To run this program, please download the db files and put it in folder ./db/ and run program from ./src/ using python 3 by anaconda distribution.
