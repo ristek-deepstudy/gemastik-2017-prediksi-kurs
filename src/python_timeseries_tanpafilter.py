@@ -1,6 +1,10 @@
-#TODO: Dokumentasi
-#TODO: check package
-#TODO: mode debugging akan menyalakan print, DEBUG_MODE==True, print on
+"""
+
+
+
+
+
+"""
 
 import sqlite3
 import sys

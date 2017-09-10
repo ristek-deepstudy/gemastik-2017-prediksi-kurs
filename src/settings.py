@@ -2,7 +2,7 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 TOKEN = "e0478de37e35bac1722299a5716f204843c7a0f011fd5447"
 
